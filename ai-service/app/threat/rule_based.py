@@ -3,9 +3,6 @@ from typing import Optional, Tuple
 from app.action_recognition.base import ActionObservation
 from app.threat.base import ThreatAssessmentAdapter
 
-# Transparent, hand-set weights — not learned from data. Documented here so the score is
-# always explainable (see docs/ai-pipeline.md Stage 4). A trained temporal model could
-# replace this class behind the same ThreatAssessmentAdapter interface later.
 BASE_SCORE_BY_ACTION = {
     "no_activity": 0.0,
     "standing": 0.05,
@@ -16,6 +13,9 @@ BASE_SCORE_BY_ACTION = {
     "fighting_candidate": 0.70,
 }
 
+AGGRESSIVE_KEYWORDS = ["fight", "punch", "kick", "wrestl", "hit", "slap", "attack", "sword", "combat"]
+FAST_MOTION_KEYWORDS = ["running", "sprint", "chas", "jog"]
+
 CLOSE_PROXIMITY_RATIO = 0.15
 PROXIMITY_BONUS = 0.10
 FAST_MOVEMENT_PX_PER_SEC = 80.0
@@ -24,18 +24,24 @@ ESCALATION_BONUS_CAP = 0.15
 
 
 class RuleBasedThreatEngine(ThreatAssessmentAdapter):
-    """Weighted, fully transparent scoring — every point added to the score is
-    traceable in the returned rationale string. This is "Temporal activity analysis and
-    potential threat/escalation prediction": it reasons over the current window plus the
-    trend from the previous window, never a single frame, and never claims certainty."""
+    mode = "DEMO"
 
-    mode = "DEMO"  # built on demo-heuristic action recognition; see docs/ai-pipeline.md
+    def assess(self, action: ActionObservation, previous_score: Optional[float]) -> Tuple[float, str]:
+        label_lower = action.label.lower()
+        if action.label in BASE_SCORE_BY_ACTION:
+            base = BASE_SCORE_BY_ACTION[action.label]
+            base_desc = f"base risk for '{action.label}' = {base:.2f}"
+        elif any(k in label_lower for k in AGGRESSIVE_KEYWORDS):
+            base = 0.55
+            base_desc = f"base risk for real-model label '{action.label}' (aggressive keyword match) = {base:.2f}"
+        elif any(k in label_lower for k in FAST_MOTION_KEYWORDS):
+            base = 0.22
+            base_desc = f"base risk for real-model label '{action.label}' (fast-motion keyword match) = {base:.2f}"
+        else:
+            base = 0.10
+            base_desc = f"base risk for unrecognized label '{action.label}' (default) = {base:.2f}"
 
-    def assess(
-        self, action: ActionObservation, previous_score: Optional[float]
-    ) -> Tuple[float, str]:
-        base = BASE_SCORE_BY_ACTION.get(action.label, 0.1)
-        parts = [f"base risk for '{action.label}' = {base:.2f}"]
+        parts = [base_desc]
         score = base
 
         proximity = action.metrics.get("min_proximity_ratio")

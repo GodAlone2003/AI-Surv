@@ -38,8 +38,12 @@ export function CameraHero({
   const statusStyle = cameraStatusStyles[camera.status];
   const isLive = camera.status === "ONLINE";
 
+    const latestFrameTimestamp = recentDetections.length
+    ? recentDetections[recentDetections.length - 1].frameTimestamp
+    : null;
+  const latestFrameDetections = recentDetections.filter((d) => d.frameTimestamp === latestFrameTimestamp);
   const objectCounts = new Map<string, number>();
-  for (const d of recentDetections) objectCounts.set(d.objectLabel, (objectCounts.get(d.objectLabel) ?? 0) + 1);
+  for (const d of latestFrameDetections) objectCounts.set(d.objectLabel, (objectCounts.get(d.objectLabel) ?? 0) + 1);
 
   return (
     <Card>

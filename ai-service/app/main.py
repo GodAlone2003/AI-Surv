@@ -50,6 +50,7 @@ async def infer_frame(payload: FrameInferenceRequest, background_tasks: Backgrou
 
     window = pipeline.buffer_store.get(payload.camera_id)
     window.add(payload.frame_timestamp, detections)
+    window.add_frame(payload.frame_timestamp, image)
     window.prune(settings.sequence_window_seconds)
 
     background_tasks.add_task(

@@ -1,3 +1,4 @@
+import { markStaleCamerasOffline } from "./services/camera.service";
 import http from "http";
 import { createApp } from "./app";
 import { env } from "./config/env";
@@ -18,8 +19,13 @@ async function main() {
     logger.info(`WebSocket listening on ws://localhost:${env.PORT}/ws`);
   });
 
+  const offlineCheckInterval = setInterval(() => {
+    markStaleCamerasOffline(15000).catch((err) => logger.error("Camera offline check failed", { message: err.message }));
+  }, 5000);
+
   const shutdown = async () => {
     logger.info("Shutting down...");
+    clearInterval(offlineCheckInterval);
     server.close();
     await prisma.$disconnect();
     process.exit(0);

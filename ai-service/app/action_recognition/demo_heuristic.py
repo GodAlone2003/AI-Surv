@@ -19,7 +19,7 @@ class DemoHeuristicActionRecognizer(ActionRecognitionAdapter):
 
     mode = "DEMO"
 
-    def recognize(self, window: List[Tuple[datetime, List[DetectionResult]]]) -> ActionObservation:
+    def recognize(self, window, frames=None) -> ActionObservation:
         if not window:
             return ActionObservation(label="no_activity", confidence=0.5, mode="DEMO", metrics={})
 

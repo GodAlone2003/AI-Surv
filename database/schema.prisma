@@ -41,6 +41,7 @@ model Camera {
   description String?
   /// "ONLINE" | "OFFLINE" | "ERROR" | "PROCESSING"
   status      String   @default("OFFLINE")
+  lastSeenAt  DateTime?
   /// true = demo/sample camera (uploaded file or bundled demo footage), not a real feed
   isDemo      Boolean  @default(false)
   createdAt   DateTime @default(now())

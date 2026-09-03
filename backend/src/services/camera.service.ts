@@ -29,6 +29,23 @@ export async function updateCamera(id: string, data: UpdateCameraInput) {
   return camera;
 }
 
+/** Flips any camera to OFFLINE if it hasn't reported a detection within `timeoutMs`.
+ * Called on a periodic interval from index.ts. */
+export async function markStaleCamerasOffline(timeoutMs: number) {
+  const cutoff = new Date(Date.now() - timeoutMs);
+  const stale = await prisma.camera.findMany({
+    where: {
+      status: "ONLINE",
+      OR: [{ lastSeenAt: null }, { lastSeenAt: { lt: cutoff } }],
+    },
+  });
+
+  for (const camera of stale) {
+    await prisma.camera.update({ where: { id: camera.id }, data: { status: "OFFLINE" } });
+    broadcast("camera.offline", { cameraId: camera.id });
+  }
+}
+
 export async function deleteCamera(id: string) {
   await getCamera(id); // 404s if missing
   await prisma.camera.delete({ where: { id } });

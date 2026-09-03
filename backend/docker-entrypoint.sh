@@ -9,6 +9,9 @@ set -e
 echo "Switching database/schema.prisma to the postgresql provider for this container..."
 sed -i 's/provider = "sqlite"/provider = "postgresql"/' ../database/schema.prisma
 
+echo "Removing stale local Prisma client..."
+rm -rf node_modules/@prisma/client node_modules/.prisma
+
 echo "Generating Prisma client..."
 npx prisma generate --schema=../database/schema.prisma
 
@@ -19,4 +22,4 @@ echo "Seeding (safe to re-run — upserts the admin user, only seeds demo camera
 npx tsx prisma/seed.ts
 
 echo "Starting backend..."
-exec node dist/index.js
+exec node dist/src/index.js

@@ -1,10 +1,28 @@
+
 import { prisma } from "../lib/prisma";
 import { broadcast } from "../websocket";
 import { evaluateAction } from "./threatEngine.service";
 import type { IngestActionInput, IngestDetectionsInput } from "../schemas/inference.schema";
 
+/** Marks a camera as actively seen. Flips status to ONLINE and broadcasts only on the
+ * actual OFFLINE -> ONLINE transition, to avoid spamming an event on every frame. */
+async function markCameraSeen(cameraId: string) {
+  const camera = await prisma.camera.findUnique({ where: { id: cameraId } });
+  if (!camera) return;
+
+  const wasOffline = camera.status !== "ONLINE";
+  const updated = await prisma.camera.update({
+    where: { id: cameraId },
+    data: { lastSeenAt: new Date(), status: "ONLINE" },
+  });
+
+  if (wasOffline) broadcast("camera.online", { cameraId, camera: updated });
+}
+
 /** Persists a batch of object-detection results from ai-service and broadcasts each. */
 export async function ingestDetections(input: IngestDetectionsInput) {
+  await markCameraSeen(input.cameraId);
+
   const created = await prisma.$transaction(
     input.detections.map((d) =>
       prisma.detection.create({

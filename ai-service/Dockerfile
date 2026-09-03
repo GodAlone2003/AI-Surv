@@ -11,6 +11,7 @@ COPY ai-service ./ai-service
 COPY models ./models
 
 WORKDIR /app/ai-service
+RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
 RUN pip install --no-cache-dir -r requirements.txt
 
 EXPOSE 8000

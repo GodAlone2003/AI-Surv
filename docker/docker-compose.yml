@@ -24,6 +24,12 @@ services:
       timeout: 5s
       retries: 10
 
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    restart: unless-stopped
+    ports:
+      - "8554:8554"
+      - "1935:1935"
   backend:
     build:
       context: ..

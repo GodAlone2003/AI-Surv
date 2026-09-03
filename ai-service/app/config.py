@@ -12,13 +12,16 @@ class Settings(BaseSettings):
     port: int = 8000
 
     detection_adapter: str = "yolov8"  # "yolov8" (real) | "mock"
-    weapon_adapter: str = "mock"  # "mock" only — no real weapon-detection model exists yet
+    weapon_adapter: str = "yolov8"  # "yolov8" (real, gun/knife) | "mock"
     action_adapter: str = "demo_heuristic"
     caption_adapter: str = "template"
     threat_adapter: str = "rule_based"
 
-    yolo_model_path: str = "../models/yolov8n.pt"
+    yolo_model_path: str = "../models/yolov8s.pt"
     yolo_confidence_threshold: float = 0.45
+
+    weapon_model_path: str = "../models/best.pt"
+    weapon_confidence_threshold: float = 0.45
 
     sequence_window_seconds: int = 6
 

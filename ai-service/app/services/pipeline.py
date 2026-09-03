@@ -14,11 +14,14 @@ from app.detection.mock_adapter import MockDetectionAdapter
 from app.schemas import ActionResult, DetectionResult
 from app.threat.base import ThreatAssessmentAdapter
 from app.threat.rule_based import RuleBasedThreatEngine
+from app.weapon.base import WeaponDetectionAdapter
+from app.weapon.mock_adapter import MockWeaponAdapter
 
 # One process-wide rolling buffer per camera — see app/common/frame_buffer.py.
 buffer_store = FrameBufferStore()
 
 _detection_adapter: Optional[ObjectDetectionAdapter] = None
+_weapon_adapter: Optional[WeaponDetectionAdapter] = None
 _action_adapter: Optional[ActionRecognitionAdapter] = None
 _caption_adapter: Optional[CaptioningAdapter] = None
 _threat_adapter: Optional[ThreatAssessmentAdapter] = None
@@ -38,10 +41,26 @@ def get_detection_adapter() -> ObjectDetectionAdapter:
     return _detection_adapter
 
 
+def get_weapon_adapter() -> WeaponDetectionAdapter:
+    global _weapon_adapter
+    if _weapon_adapter is None:
+        if settings.weapon_adapter == "yolov8":
+            from app.weapon.yolov8_weapon_adapter import YoloV8WeaponAdapter
+
+            _weapon_adapter = YoloV8WeaponAdapter()
+        else:
+            _weapon_adapter = MockWeaponAdapter()
+    return _weapon_adapter
+
+
 def get_action_adapter() -> ActionRecognitionAdapter:
     global _action_adapter
     if _action_adapter is None:
-        _action_adapter = DemoHeuristicActionRecognizer()
+        if settings.action_adapter == "videomae":
+            from app.action_recognition.videomae_adapter import VideoMAEActionRecognizer
+            _action_adapter = VideoMAEActionRecognizer()
+        else:
+            _action_adapter = DemoHeuristicActionRecognizer()
     return _action_adapter
 
 
@@ -60,7 +79,9 @@ def get_threat_adapter() -> ThreatAssessmentAdapter:
 
 
 def detect_frame(image: np.ndarray) -> List[DetectionResult]:
-    return get_detection_adapter().detect(image)
+    detections = get_detection_adapter().detect(image)
+    detections += get_weapon_adapter().detect(image)
+    return detections
 
 
 def evaluate_window(camera_id: str) -> Optional[Tuple[ActionResult, datetime, datetime]]:
@@ -72,8 +93,9 @@ def evaluate_window(camera_id: str) -> Optional[Tuple[ActionResult, datetime, da
         return None
 
     had_previous = window.last_evaluated_at is not None
-    observation = get_action_adapter().recognize(entries)
-    detections = window.all_detections()
+    frames = window.get_frame_sequence(16)
+    observation = get_action_adapter().recognize(entries, frames)
+    detections = window.latest_detections()
     description = get_caption_adapter().caption(detections, observation)
     threat_score, rationale = get_threat_adapter().assess(
         observation, window.last_threat_score if had_previous else None
