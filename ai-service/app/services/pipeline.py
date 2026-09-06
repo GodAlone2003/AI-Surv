@@ -3,7 +3,7 @@ from typing import List, Optional, Tuple
 
 import numpy as np
 
-from app.action_recognition.base import ActionRecognitionAdapter
+from app.action_recognition.base import ActionObservation, ActionRecognitionAdapter
 from app.action_recognition.demo_heuristic import DemoHeuristicActionRecognizer
 from app.captioning.base import CaptioningAdapter
 from app.captioning.template_adapter import TemplateCaptioner
@@ -26,10 +26,12 @@ _action_adapter: Optional[ActionRecognitionAdapter] = None
 _caption_adapter: Optional[CaptioningAdapter] = None
 _threat_adapter: Optional[ThreatAssessmentAdapter] = None
 
+WEAPON_LABELS = {"gun", "knife"}
+
+ACTION_RECOGNITION_ENABLED = False
+
 
 def get_detection_adapter() -> ObjectDetectionAdapter:
-    """Lazily constructed singleton so importing this module never triggers a model
-    load (useful for tests / DETECTION_ADAPTER=mock) — only the first real request does."""
     global _detection_adapter
     if _detection_adapter is None:
         if settings.detection_adapter == "yolov8":
@@ -93,19 +95,43 @@ def evaluate_window(camera_id: str) -> Optional[Tuple[ActionResult, datetime, da
         return None
 
     had_previous = window.last_evaluated_at is not None
-    frames = window.get_frame_sequence(16)
-    observation = get_action_adapter().recognize(entries, frames)
+    if ACTION_RECOGNITION_ENABLED:
+        frames = window.get_frame_sequence(16)
+        observation = get_action_adapter().recognize(entries, frames)
+    else:
+        observation = ActionObservation(
+            label="action_recognition_disabled",
+            confidence=0.0,
+            mode="DEMO",
+        )
     detections = window.latest_detections()
     description = get_caption_adapter().caption(detections, observation)
     threat_score, rationale = get_threat_adapter().assess(
         observation, window.last_threat_score if had_previous else None
     )
 
+    # Weapon override: a gun/knife in frame is an immediate critical threat regardless
+    # of the action-recognition score — see app/weapon/yolov8_weapon_adapter.py for the
+    # detector. This intentionally bypasses the action-based label/score below rather
+    # than blending with it, since "a weapon is visible" should never be diluted by an
+    # unrelated low action score.
+    weapon_hits = sorted({d.object for d in detections if d.object.lower() in WEAPON_LABELS})
+    if weapon_hits:
+        threat_score = max(threat_score, 0.95)
+        weapon_list = " and ".join(weapon_hits)
+        rationale = (
+            f"Weapon detected in frame ({weapon_list}) - immediate critical threat, "
+            f"independent of action score. " + rationale
+        )
+        label = f"weapon_detected_{'_'.join(weapon_hits)}"
+    else:
+        label = observation.label
+
     window_start, window_end = window.window_start(), window.window_end()
     window.mark_evaluated(threat_score)
 
     action_result = ActionResult(
-        label=observation.label,
+        label=label,
         confidence=observation.confidence,
         description=description,
         mode=observation.mode,

@@ -5,7 +5,7 @@
 # video-processing/README.md).
 FROM python:3.12-slim
 
-RUN apt-get update && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 \
+RUN apt-get update && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app/video-processing

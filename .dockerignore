@@ -1,7 +1,18 @@
-ai-service/venv/
-ai-service/.pytest_cache/
+# Local virtualenvs — never needed in any image; each Dockerfile installs its own deps
+**/venv/
+**/.venv/
 **/__pycache__/
-**/*.pyc
+*.pyc
+
+# Git history
 .git/
-node_modules/
+
+# Node
 **/node_modules/
+
+# Demo/test video data — mounted at runtime via docker/data volume, not baked into images
+docker/data/
+
+# OS/editor cruft
+.DS_Store
+*.swp

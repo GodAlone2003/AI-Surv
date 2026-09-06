@@ -1,0 +1,5 @@
+readTimeout: 3600s
+writeTimeout: 3600s
+
+paths:
+  mystream:
